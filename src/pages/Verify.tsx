@@ -39,39 +39,25 @@ export function Verify() {
     setResult(null);
 
     try {
-      // Fetch all students (since we need case-insensitive match, and rollNo might not be perfectly indexed if optional)
-      // Alternatively, query by rollNo exactly:
-      const studentQ = query(collection(db, "students"), where("rollNo", "==", rollNo.trim()));
-      const studentSnap = await getDocs(studentQ);
+      const rollInput = rollNo.trim();
+      let studentSnap = await getDocs(query(collection(db, "students"), where("rollNo", "==", rollInput)));
+      
+      if (studentSnap.empty) {
+        studentSnap = await getDocs(query(collection(db, "students"), where("rollNo", "==", rollInput.toUpperCase())));
+      }
+      if (studentSnap.empty) {
+        studentSnap = await getDocs(query(collection(db, "students"), where("rollNo", "==", rollInput.toLowerCase())));
+      }
       
       let matchedStudentData: StudentDetails | null = null;
 
       if (!studentSnap.empty) {
-        // Roll no matched. Now check name and fatherName case-insensitively
         for (const doc of studentSnap.docs) {
           const data = doc.data() as StudentDetails;
           const dbName = (data.name || "").toLowerCase().trim();
           const dbFather = (data.fatherName || "").toLowerCase().trim();
           
           if (
-            dbName === studentName.toLowerCase().trim() && 
-            dbFather === fatherName.toLowerCase().trim()
-          ) {
-            matchedStudentData = data;
-            break;
-          }
-        }
-      } else {
-        // If rollNo query fails, fallback to fetching all students and checking manually (in case of case issues in rollNo)
-        const allStudentsSnap = await getDocs(collection(db, "students"));
-        for (const doc of allStudentsSnap.docs) {
-          const data = doc.data() as StudentDetails;
-          const dbRoll = (data.rollNo || "").toLowerCase().trim();
-          const dbName = (data.name || "").toLowerCase().trim();
-          const dbFather = (data.fatherName || "").toLowerCase().trim();
-          
-          if (
-            dbRoll === rollNo.toLowerCase().trim() &&
             dbName === studentName.toLowerCase().trim() && 
             dbFather === fatherName.toLowerCase().trim()
           ) {
@@ -94,16 +80,6 @@ export function Verify() {
       let matchedCertData: CertificateDetails | null = null;
       if (!certSnap.empty) {
         matchedCertData = certSnap.docs[0].data() as CertificateDetails;
-      } else {
-        // Try fetching all certs and matching case-insensitively
-        const allCertsSnap = await getDocs(collection(db, "certificates"));
-        for (const doc of allCertsSnap.docs) {
-          const data = doc.data() as CertificateDetails;
-          if ((data.studentName || "").toLowerCase().trim() === (matchedStudentData.name || "").toLowerCase().trim()) {
-            matchedCertData = data;
-            break;
-          }
-        }
       }
 
       if (matchedCertData) {
@@ -219,13 +195,13 @@ export function Verify() {
 
               {/* Professional Certificate Design */}
               <div className="w-full overflow-x-auto pb-8">
-                <div className="min-w-[800px] max-w-[1000px] mx-auto bg-white p-2 shadow-2xl relative" style={{aspectRatio: '1.414/1'}}>
-                  <div className="w-full h-full border-[12px] border-double border-[#2c3e50] p-8 relative flex flex-col items-center text-center">
+                <div className="min-w-[800px] max-w-[1000px] mx-auto bg-white p-2 shadow-2xl relative">
+                  <div className="w-full min-h-[600px] border-[12px] border-double border-[#2c3e50] p-8 relative flex flex-col items-center text-center">
                     
                     {/* Top Labels */}
                     <div className="w-full flex justify-between text-xs font-semibold text-gray-600 mb-6 font-serif">
-                      <span>Enrollment No. {result.certNo || "N/A"}</span>
-                      <span>Regd. No. {result.certNo || "N/A"}</span>
+                      <span>Enrollment No. {result.certNo || ""}</span>
+                      <span>Regd. No. {result.certNo || ""}</span>
                     </div>
 
                     {/* Institute Title */}
@@ -253,7 +229,7 @@ export function Verify() {
                       <div className="flex items-end justify-center gap-2">
                         <span>This is to certify that Mr./Mrs./Miss</span>
                         <span className="flex-1 border-b border-black font-bold text-xl px-4 text-center inline-block min-w-[250px] uppercase">
-                          {result.student.name || "-"}
+                          {result.student.name || ""}
                         </span>
                       </div>
 
@@ -261,55 +237,61 @@ export function Verify() {
                         <div className="flex items-end flex-1 w-full gap-2">
                           <span className="whitespace-nowrap">S/O, D/O -</span>
                           <span className="flex-1 border-b border-black font-bold text-lg px-2 text-center uppercase min-w-[150px]">
-                            {result.student.fatherName || "-"}
+                            {result.student.fatherName || ""}
                           </span>
                         </div>
-                        <div className="flex items-end flex-1 w-full gap-2">
-                          <span className="whitespace-nowrap">M/O</span>
-                          <span className="flex-1 border-b border-black font-bold text-lg px-2 text-center uppercase min-w-[150px]">
-                            {result.student.motherName || "-"}
-                          </span>
-                        </div>
+                        {result.student.motherName && (
+                          <div className="flex items-end flex-1 w-full gap-2">
+                            <span className="whitespace-nowrap">M/O</span>
+                            <span className="flex-1 border-b border-black font-bold text-lg px-2 text-center uppercase min-w-[150px]">
+                              {result.student.motherName}
+                            </span>
+                          </div>
+                        )}
                       </div>
 
                       <div className="flex items-end justify-center gap-2">
                         <span className="whitespace-nowrap">has been Completed</span>
                         <span className="flex-1 border-b border-black font-bold text-lg px-4 text-center uppercase min-w-[300px]">
-                          {result.cert.courseName || "-"}
+                          {result.cert.courseName || ""}
                         </span>
                       </div>
 
-                      <div className="flex items-end justify-center gap-4">
-                        <div className="flex items-end gap-2">
-                          <span className="whitespace-nowrap">with placed in grade</span>
-                          <span className="border-b border-black font-bold text-lg px-4 text-center min-w-[60px]">
-                            {result.cert.grade ? `'${result.cert.grade}'` : "-"}
-                          </span>
-                        </div>
+                      <div className="flex items-end justify-center gap-6">
+                        {result.cert.grade && (
+                          <div className="flex items-end gap-2">
+                            <span className="whitespace-nowrap">with placed in grade</span>
+                            <span className="border-b border-black font-bold text-lg px-4 text-center min-w-[60px]">
+                              '{result.cert.grade}'
+                            </span>
+                          </div>
+                        )}
                         <div className="flex items-end gap-2">
                           <span className="whitespace-nowrap">Roll No.</span>
                           <span className="border-b border-black font-bold text-lg px-4 text-center min-w-[100px]">
-                            {result.student.rollNo || "-"}
+                            {result.student.rollNo || ""}
                           </span>
                         </div>
                       </div>
 
-                      <div className="flex items-end justify-center gap-2 pt-2">
-                        <span className="whitespace-nowrap">This course was conducted in Naini Prayagraj from</span>
-                        <span className="border-b border-black font-bold text-base px-2 text-center min-w-[100px]">
-                          {result.cert.startDate || "-"}
-                        </span>
-                        <span className="whitespace-nowrap">to</span>
-                        <span className="border-b border-black font-bold text-base px-2 text-center min-w-[100px]">
-                          {result.cert.endDate || "-"}
-                        </span>
-                      </div>
+                      {(result.cert.startDate || result.cert.endDate) && (
+                        <div className="flex items-end justify-center gap-2 pt-2">
+                          <span className="whitespace-nowrap">This course was conducted in Naini Prayagraj from</span>
+                          <span className="border-b border-black font-bold text-base px-2 text-center min-w-[100px]">
+                            {result.cert.startDate || ""}
+                          </span>
+                          <span className="whitespace-nowrap">to</span>
+                          <span className="border-b border-black font-bold text-base px-2 text-center min-w-[100px]">
+                            {result.cert.endDate || ""}
+                          </span>
+                        </div>
+                      )}
 
                     </div>
 
                     {/* Signatures */}
                     <div className="w-full flex justify-between items-end mt-12 px-8 font-serif">
-                      <div className="text-center w-40">
+                      <div className="text-center w-48">
                         <div className="h-12 flex items-center justify-center text-2xl text-blue-900 border-b border-gray-400" style={{fontFamily: 'cursive'}}>
                           Anoop Kumar
                         </div>
@@ -317,10 +299,10 @@ export function Verify() {
                       </div>
                       
                       <div className="text-center">
-                        <span className="text-sm font-semibold block">Date: {result.cert.issueDate ? new Date(result.cert.issueDate).toLocaleDateString('en-IN') : "-"}</span>
+                        <span className="text-sm font-semibold block">Date: {result.cert.issueDate ? new Date(result.cert.issueDate).toLocaleDateString('en-IN') : ""}</span>
                       </div>
 
-                      <div className="text-center w-40">
+                      <div className="text-center w-48">
                         <div className="h-12 flex items-center justify-center text-2xl text-blue-900 border-b border-gray-400" style={{fontFamily: 'cursive'}}>
                           Kamakhya Prasad
                         </div>
