@@ -9,19 +9,33 @@ export function AdminLogin() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [isRegistering, setIsRegistering] = useState(false);
   const navigate = useNavigate();
 
-  const handleLogin = async (e: React.FormEvent) => {
+  const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setError("");
 
     try {
-      await signInWithEmailAndPassword(auth, email, password);
+      if (isRegistering) {
+        const { createUserWithEmailAndPassword } = await import("firebase/auth");
+        await createUserWithEmailAndPassword(auth, email, password);
+      } else {
+        await signInWithEmailAndPassword(auth, email, password);
+      }
       navigate("/admin");
     } catch (err: any) {
-      console.error("Login Error:", err);
-      setError("Invalid email or password. Please try again.");
+      console.error("Auth Error:", err);
+      if (err.code === 'auth/email-already-in-use') {
+        setError("This email is already registered. Please sign in instead.");
+      } else if (err.code === 'auth/invalid-credential') {
+        setError("Invalid email or password. If you are on a new Firebase project, click 'Create Account' below to register first.");
+      } else if (err.code === 'auth/weak-password') {
+        setError("Password should be at least 6 characters.");
+      } else {
+        setError("An error occurred. Please check your credentials.");
+      }
     } finally {
       setLoading(false);
     }
@@ -38,11 +52,11 @@ export function AdminLogin() {
             Admin Portal
           </h2>
           <p className="mt-2 text-center text-sm text-gray-600">
-            Sign in to manage your institute
+            {isRegistering ? "Create your admin account for the new project" : "Sign in to manage your institute"}
           </p>
         </div>
         
-        <form className="mt-8 space-y-6" onSubmit={handleLogin}>
+        <form className="mt-8 space-y-6" onSubmit={handleAuth}>
           {error && (
             <div className="bg-red-50 text-red-700 p-4 rounded-xl text-sm font-medium border border-red-100 text-center">
               {error}
@@ -89,8 +103,21 @@ export function AdminLogin() {
               {loading ? (
                 <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
               ) : (
-                "Sign In"
+                isRegistering ? "Create Account" : "Sign In"
               )}
+            </button>
+          </div>
+
+          <div className="text-center mt-4">
+            <button
+              type="button"
+              onClick={() => {
+                setIsRegistering(!isRegistering);
+                setError("");
+              }}
+              className="text-indigo-600 hover:text-indigo-800 text-sm font-semibold transition-colors"
+            >
+              {isRegistering ? "Already have an account? Sign In" : "First time setup? Create Admin Account"}
             </button>
           </div>
         </form>
