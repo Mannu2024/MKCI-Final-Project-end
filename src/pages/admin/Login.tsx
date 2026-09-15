@@ -31,6 +31,8 @@ export function AdminLogin() {
         setError("This email is already registered. Please sign in instead.");
       } else if (err.code === 'auth/invalid-credential') {
         setError("Invalid email or password. If you are on a new Firebase project, click 'Create Account' below to register first.");
+      } else if (err.code === 'auth/api-key-not-valid' || err.message?.includes('api-key-not-valid')) {
+        setError("The Firebase API key for this project is invalid or deleted. Please update VITE_FIREBASE_API_KEY in the AI Studio settings -> secrets.");
       } else if (err.code === 'auth/weak-password') {
         setError("Password should be at least 6 characters.");
       } else {
